@@ -1,6 +1,7 @@
 import numpy as np, cv2
 
-cap = cv2.VideoCapture('../img/walking.avi')
+#cap = cv2.VideoCapture('../img/walking.avi')
+cap = cv2.VideoCapture(0)
 fps = cap.get(cv2.CAP_PROP_FPS) # 프레임 수 구하기
 delay = int(1000/fps)
 
