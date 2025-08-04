@@ -67,3 +67,34 @@ def search(img):
         results = sorted([(v, k) for (k, v) in results.items()
                           if v > 0], reverse=True)
     return results
+
+# 책 촬영 (카메라 입력)
+cap = cv2.VideoCapture(0)
+qImg = None
+
+while cap.isOpened():
+    ret, frame = cap.read()
+    if not ret:
+        print('No Frame!')
+        break
+
+    h, w = frame.shape[:2]
+    left = w // 3
+    right = (w // 3) * 2
+    top = (h // 2) - (h // 3)
+    bottom = (h // 2) + (h // 3)
+    cv2.rectangle(frame, (left,top), (right,bottom), (255,255,255), 3)
+
+    flip = cv2.flip(frame, 1)
+    cv2.imshow('Book Searcher', flip)
+
+    key = cv2.waitKey(10)
+    if key == ord(' '):
+        qImg = frame[top:bottom, left:right]
+        cv2.imshow('Query', qImg)
+        break
+    elif key == 27:
+        break
+else:
+    print('No Camera!!')
+cap.release()
