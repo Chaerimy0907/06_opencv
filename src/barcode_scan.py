@@ -1,7 +1,16 @@
+'''
+기존 방식 (ORB + FLANN 매칭) 
+- 바코드는 특징점이 거의 없고, 패턴도 단순해서 ORB로 매칭 불가
+
+수정 방식 cv2.matchTemplate() 방식 사용
+- 바코드처럼 단순한 직선 패턴도 매칭 가능
+- 특징점 필요 없음 -> detectAndCompute() 불필요
+'''
+
 import cv2, numpy as np
 
 # 초기 설정
-img1 = None # ROI로 선택할 이미지
+img1 = None # 참조 이미지 (ROI 선택 영역)
 win_name = 'Camera Matching'
 MIN_MATCH = 10  # 최소 매칭점 개수 (이 값 이하면 매칭 실패로 간주)
 
@@ -29,9 +38,9 @@ while cap.isOpened():
     if not ret:
         break
     
-    if img1 is None:  # 등록된 이미지 없음, 카메라 바이패스
+    if img1 is None:  # ROI 없으면 그대로 출력
         res = frame.copy()
-    else:             # 등록된 이미지 있는 경우, 매칭 시작
+    else:
         img2 = frame.copy()
         # [step 1]
         gray1 = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)  # 참조 이미지
