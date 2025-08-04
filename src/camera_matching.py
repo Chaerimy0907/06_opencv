@@ -28,38 +28,63 @@ while cap.isOpened():
         gray2 = cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY)
         # 키포인트와 디스크립터 추출
         kp1, desc1 = detector.detectAndCompute(gray1, None)
-        kp2, desc2 = detector.detectAndCompute(gray2, None)
-        # k=2로 knnMatch
-        matches = matcher.knnMatch(desc1, desc2, 2)
+        kp2, desc2 = detector.detectAndCompute(img2, None)
+
+        # 디스크립터가 없으면 건너뛰기
+        if desc1 is None or desc2 is None or len(desc1) < 2 or len(desc2) < 2:
+            res = frame
+        else:
+            # k=2로 knnMatch
+            matches = matcher.knnMatch(desc1, desc2, 2)
+
         # 이웃 거리의 75%로 좋은 매칭점 추출---②
         ratio = 0.75
-        good_matches = [m[0] for m in matches \
-                if len(m) == 2 and m[0].distance < m[1].distance * ratio]
+        good_matches = []
+        for match_pair in matches:
+            if len(match_pair) == 2:
+                m, n = match_pair
+                if m.distance < n.distance * ratio:
+                    good_matches.append(m)
+        #good_matches = [m[0] for m in matches \
+                #if len(m) == 2 and m[0].distance < m[1].distance * ratio]
         print('good matches:%d/%d' %(len(good_matches),len(matches)))
         
+        # matchesMask 초기화를 None으로 설정
+        matchesMask = None
+
         # 모든 매칭점 그리지 못하게 마스크를 0으로 채움
-        matchesMask = np.zeros(len(good_matches)).tolist()
+        #matchesMask = np.zeros(len(good_matches)).tolist()
 
         # 좋은 매칭점 최소 갯수 이상 인 경우
         if len(good_matches) > MIN_MATCH: 
             
             # 좋은 매칭점으로 원본과 대상 영상의 좌표 구하기 ---③
-            src_pts = np.float32([ kp1[m.queryIdx].pt for m in good_matches ])
-            dst_pts = np.float32([ kp2[m.trainIdx].pt for m in good_matches ])
+            src_pts = np.float32([ kp1[m.queryIdx].pt for m in good_matches ]).reshape(-1, 1, 2)
+            dst_pts = np.float32([ kp2[m.trainIdx].pt for m in good_matches ]).reshape(-1, 1, 2)
+            
             # 원근 변환 행렬 구하기 ---⑤
             mtrx, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
-            accuracy=float(mask.sum()) / mask.size
-            print("accuracy: %d/%d(%.2f%%)"% (mask.sum(), mask.size, accuracy))
-            if mask.sum() > MIN_MATCH:  # 정상치 매칭점 최소 갯수 이상 인 경우
-                # 이상점 매칭점만 그리게 마스크 설정
-                matchesMask = mask.ravel().tolist()
-                # 원본 영상 좌표로 원근 변환 후 영역 표시  ---⑦
-                h,w, = img1.shape[:2]
-                pts = np.float32([ [[0,0]],[[0,h-1]],[[w-1,h-1]],[[w-1,0]] ])
-                dst = cv2.perspectiveTransform(pts,mtrx)
-                img2 = cv2.polylines(img2,[np.int32(dst)],True,255,3, cv2.LINE_AA)
-                # 마스크로 매칭점 그리기 ---⑨
+            
+            #accuracy=float(mask.sum()) / mask.size
+            #print("accuracy: %d/%d(%.2f%%)"% (mask.sum(), mask.size, accuracy))
+            
+            if mtrx is not None:
+                accuracy=float(mask.sum()) / mask.size
+                print("accuracy: %d/%d(%.2f%%)"% (mask.sum(), mask.size, accuracy * 100))
+            
+                if mask.sum() > MIN_MATCH:  # 정상치 매칭점 최소 갯수 이상 인 경우
+                    # 마스크를 리스트로 변환 (정수형으로)
+                    matchesMask = [int(x) for x in mask.ravel()]
+
+                    # 원본 영상 좌표로 원근 변환 후 영역 표시  ---⑦
+                    h,w, = img1.shape[:2]
+                    pts = np.float32([ [[0,0]],[[0,h-1]],[[w-1,h-1]],[[w-1,0]] ])
+                    dst = cv2.perspectiveTransform(pts,mtrx)
+                    img2 = cv2.polylines(img2,[np.int32(dst)],True, (0, 255, 0), 3, cv2.LINE_AA)
+        
+        # 마스크로 매칭점 그리기 ---⑨
         res = cv2.drawMatches(img1, kp1, img2, kp2, good_matches, None, \
+                            matchColor = (0, 255, 0), singlePointColor = None, \
                             matchesMask=matchesMask,
                             flags=cv2.DRAW_MATCHES_FLAGS_NOT_DRAW_SINGLE_POINTS)
     # 결과 출력
@@ -71,6 +96,7 @@ while cap.isOpened():
         x,y,w,h = cv2.selectROI(win_name, frame, False)
         if w and h:
             img1 = frame[y:y+h, x:x+w]
+            print("ROI 선택됨 : (%d, %d, %d, %d)"%(x,y,w,h))
 else:
     print("can't open camera.")
 cap.release()                          
