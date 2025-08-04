@@ -1,9 +1,11 @@
-import cv2, numpy as np, glob, os
+import cv2, numpy as np, glob, os, time, webbrowser
 
 # 설정값
 ratio = 0.7     # 좋은 매칭 선별 비율
 MIN_MATCH = 10  # 최소 매칭점 수
 detector = cv2.ORB_create(1000) # 특징점 개수 제한
+
+book_links = {'book21.jpg': 'https://www.yes24.com/product/goods/117762049'}
 
 # Flann 매칭기 객체 생성
 FLANN_INDEX_LSH = 6 # LSH 알고리즘
@@ -32,7 +34,7 @@ def search(img):
     results = {}
 
     # 책 커버 폴더에서 모든 이미지 파일 찾기
-    book_paths = glob.glob('../img/books')
+    book_paths = glob.glob('../img/books/*.*')
 
     for book_path in book_paths:
         cover = cv2.imread(book_path)
@@ -41,7 +43,7 @@ def search(img):
         cv2.waitKey(5)  # 짧은 대기로 화면 업데이트
 
         # 데이터베이스 이미지 전처리 및 특징점 검출
-        gray2 = cv2.cvtCoor(cover, cv2.COLOR_BGR2GRAY)
+        gray2 = cv2.cvtColor(cover, cv2.COLOR_BGR2GRAY)
         kp2, desc2 = detector.detectAndCompute(gray2, None)
 
         if desc1 is None or desc2 is None:
@@ -68,33 +70,51 @@ def search(img):
                           if v > 0], reverse=True)
     return results
 
-# 책 촬영 (카메라 입력)
 cap = cv2.VideoCapture(0)
-qImg = None
+win_name = "Capture ROI"
 
-while cap.isOpened():
+while True:
     ret, frame = cap.read()
     if not ret:
-        print('No Frame!')
         break
 
-    h, w = frame.shape[:2]
-    left = w // 3
-    right = (w // 3) * 2
-    top = (h // 2) - (h // 3)
-    bottom = (h // 2) + (h // 3)
-    cv2.rectangle(frame, (left,top), (right,bottom), (255,255,255), 3)
+    cv2.imshow(win_name, frame)
+    key = cv2.waitKey(1)
 
-    flip = cv2.flip(frame, 1)
-    cv2.imshow('Book Searcher', flip)
+    if key == 27:  # ESC
+        break
+    elif key == ord(' '):  # SPACE로 ROI 선택
+        x, y, w, h = cv2.selectROI(win_name, frame, False)
+        if w and h:
+            roi = frame[y:y+h, x:x+w]
+            cv2.imshow("ROI", roi)
+            cv2.imwrite("query.jpg", roi)  # 나중에 불러와서 매칭용으로 쓰기
+            print("Saved as query.jpg")
+            break
 
-    key = cv2.waitKey(10)
-    if key == ord(' '):
-        qImg = frame[top:bottom, left:right]
-        cv2.imshow('Query', qImg)
-        break
-    elif key == 27:
-        break
-else:
-    print('No Camera!!')
 cap.release()
+cv2.destroyAllWindows()
+
+# 결과 처리 및 링크 열기
+if roi is not None:
+    results = search(roi)
+    if len(results) == 0:
+        print("No matched book cover found.")
+    else:
+        for i, (accuracy, cover_path) in enumerate(results):
+            print(f"{i}: {cover_path} - 정확도: {accuracy:.2%}")
+
+            if i == 0:
+                cover = cv2.imread(cover_path)
+                cv2.imshow('Result', cover)
+
+                fname = os.path.basename(cover_path)
+                if accuracy >= 0.90 and fname in book_links:
+                    print(f">>> 정확도 {accuracy:.2%}로 링크 열기: {book_links[fname]}")
+                    time.sleep(1)
+                    webbrowser.open(book_links[fname])
+                else:
+                    print(">>> 정확도 부족 또는 등록된 링크 없음.")
+
+cv2.waitKey()
+cv2.destroyAllWindows()
