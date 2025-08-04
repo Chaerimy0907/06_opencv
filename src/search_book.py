@@ -116,5 +116,13 @@ if roi is not None:
                 else:
                     print(">>> 정확도 부족 또는 등록된 링크 없음.")
 
+start_time = time.time()
+
+results = search(roi)
+
+search_time = time.time() - start_time
+
+print(f"검색 시간: {search_time:.2f}초")
+
 cv2.waitKey()
 cv2.destroyAllWindows()
