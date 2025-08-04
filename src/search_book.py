@@ -14,6 +14,7 @@ index_params = dict(algorithm = FLANN_INDEX_LSH,
 search_params = dict(checks=32)     # 검색 시 확인할 리프 노드 수
 matcher = cv2.FlannBasedMatcher(index_params, search_params)
 
+# 이미지 크기 변경 (성능 최적화)
 def resize_image(img, max_width=400):
     h, w = img.shape[:2]
     if w > max_width:
@@ -22,9 +23,10 @@ def resize_image(img, max_width=400):
         img = cv2.resize(img, (max_width, new_h))
     return img
 
-def search_book(query_img):
+# 책 이미지 검색 함수
+def search(img):
     # 이미지 전처리
-    gray1 = cv2.cvtColor(query_img, cv2.COLOR_BGR2GRAY)
+    gray1 = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     kp1, desc1 = detector.detectAndCompute(gray1, None)
 
     results = {}
@@ -49,7 +51,8 @@ def search_book(query_img):
         matches = matcher.knnMatch(desc1, desc2, 2)
 
         # Lovwe's 비율 테스트로 좋은 매칭 선별
-        good_matches = [m[0] for m in matches if len(m)==2 and m[0].distance < m[1].distance * ratio]
+        good_matches = [m[0] for m in matches 
+                        if len(m)==2 and m[0].distance < m[1].distance * ratio]
 
         if len(good_matches) > MIN_MATCH:
             src_pts = np.float32([kp1[m.queryIdx].pt for m in good_matches])
@@ -61,5 +64,6 @@ def search_book(query_img):
                 results[book_path] = accuracy
     
     if len(results) > 0:
-        results = sorted([(v, k) for (k, v) in results.items()], reverse=True)
+        results = sorted([(v, k) for (k, v) in results.items()
+                          if v > 0], reverse=True)
     return results
